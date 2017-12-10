@@ -141,13 +141,11 @@ void sum_col_cpu(float *l1_host, float *l2_host, float *lx_host, float *ly_host,
 
 int compare(float *array1, float *array2, int n)
 {
-	int i, error=0;
+	int i, error = 0;
 	float thol = 0.00001f;
 	for (i = 0; i < n; i++) {
 		if ((fabsf(array1[i] - array2[i]) / array2[i])> thol) error++;
-		
-		//if (array1[i] != array2[i]) return 0;
-		//printf("Device is %f, host is %f\n", array1[i], array2[i]);
+
 	}
 	return error;
 }
@@ -160,9 +158,48 @@ void printMatrix(float *A, int width, int height)
 			printf("%f ", A[i * width + j]);
 		printf("\n");
 	}
-	/*for (m = 0; m < width * height; m++) {
-	printf("%f ", A[m]);
-	}
-	*/
 	printf("\n\n");
+}
+
+void compute_template_feature_cpu(float *S1, float *S2, float *Sx, float *Sy, float *v1, float *v2, float *v3, float *v4, float *l1_host, float *l2_host, float *lx_host, float *ly_host, int K, int M, int N)
+{
+	int WIDTH = M - K + 1;
+	int HEIGHT = N - K + 1;
+	for (int i = 0; i < HEIGHT; i++) {
+		for (int j = 0; j < WIDTH; j++) {
+			S1[i*WIDTH + j] = l1_host[(i + K - 1)*M + j + K - 1] - l1_host[(i + K - 1)*M + j] - l1_host[i *M + j + K - 1] + l1_host[i *M + j];
+			S2[i*WIDTH + j] = l2_host[(i + K - 1)*M + j + K - 1] - l2_host[(i + K - 1)*M + j] - l2_host[i *M + j + K - 1] + l2_host[i *M + j];
+			Sx[i*WIDTH + j] = lx_host[(i + K - 1)*M + j + K - 1] - lx_host[(i + K - 1)*M + j] - lx_host[i *M + j + K - 1] + lx_host[i *M + j];
+			Sy[i*WIDTH + j] = ly_host[(i + K - 1)*M + j + K - 1] - ly_host[(i + K - 1)*M + j] - ly_host[i *M + j + K - 1] + ly_host[i *M + j];
+		}
+	}
+	for (int i = 0; i < HEIGHT; i++) {
+		for (int j = 0; j < WIDTH; j++) {
+			v1[i*WIDTH + j] = S1[i*WIDTH + j] / K / K;
+			v2[i*WIDTH + j] = S2[i*WIDTH + j] / K / K - v1[i*WIDTH + j] * v1[i*WIDTH + j];
+			v3[i*WIDTH + j] = 4.0 * (Sx[i*WIDTH + j] - (j + 1.0 * (K - 1) / 2) * S1[i*WIDTH + j]) / K / K / K;
+			v4[i*WIDTH + j] = 4.0 * (Sy[i*WIDTH + j] - (i + 1.0 * (K - 1) / 2) * S1[i*WIDTH + j]) / K / K / K;
+		}
+	}
+}
+
+void find_min(float *X, int &X1, int &X2, int &Y1, int &Y2, int I_width, int I_height, int T_width)
+{
+	int idx, idx_x, idx_y;
+	float min = X[0];
+	for (int i = 0; i < (I_width - T_width + 1)*(I_height - T_width + 1); i++)
+	{
+		if (min >= X[i])
+		{
+			idx = i;
+			min = X[i];
+		}
+	}
+	idx_x = idx % (I_width - T_width + 1);
+	idx_y = idx / (I_width - T_width + 1);
+
+	X1 = idx_x;
+	X2 = X1 + T_width - 1;
+	Y1 = idx_y;
+	Y2 = Y1 + T_width - 1;
 }
